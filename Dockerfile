@@ -7,20 +7,34 @@ RUN apk add --no-cache ca-certificates tzdata git
 
 WORKDIR /app
 
+# ---- 先准备根模块（给 realtime_game 用）----
 COPY go.mod ./
 COPY go.sum ./
 RUN go mod download
 
+# ---- 再准备 frontend 子模块 ----
+COPY realtime_frontend/go.mod ./realtime_frontend/go.mod
+COPY realtime_frontend/go.sum ./realtime_frontend/go.sum
+WORKDIR /app/realtime_frontend
+RUN go mod download
+
+# ---- 回到根目录，复制源码 ----
+WORKDIR /app
+COPY deploy ./deploy
 COPY model ./model
 COPY realtime_frontend ./realtime_frontend
 COPY realtime_game ./realtime_game
-
 
 ENV CGO_ENABLED=0
 ENV GOOS=linux
 ENV GOARCH=amd64
 
-RUN go build -ldflags="-s -w" -o /out/realtime_frontend ./realtime_frontend
+# build frontend（独立模块）
+WORKDIR /app/realtime_frontend
+RUN go build -ldflags="-s -w" -o /out/realtime_frontend .
+
+# build api / worker（根模块）
+WORKDIR /app
 RUN go build -ldflags="-s -w" -o /out/realtime_api ./realtime_game/cmd/realtime-api
 RUN go build -ldflags="-s -w" -o /out/realtime_worker ./realtime_game/cmd/realtime-worker
 
