@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
         - name: realtime-worker
-          image: flxu/realtime_game:worker-v0.0.1
+          image: flxu/realtime_game:worker-latest
           imagePullPolicy: IfNotPresent
           envFrom:
             - configMapRef:

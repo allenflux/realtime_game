@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
         - name: realtime-api
-          image: flxu/realtime_game:api-v0.0.1
+          image: flxu/realtime_game:api-latest
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8081

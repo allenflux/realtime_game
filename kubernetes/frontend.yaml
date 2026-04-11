@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
         - name: realtime-frontend
-          image: flxu/realtime_game:frontend-v0.0.1
+          image: flxu/realtime_game:frontend-latest
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080
