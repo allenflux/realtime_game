@@ -6,9 +6,8 @@ metadata:
   namespace: crash-test
 data:
   TZ: "Asia/Shanghai"
-  FRONTEND_PORT: "8080"
-  API_PORT: "18080"
-  API_BASE_URL: "http://realtime-api:18080"
+  FRONTEND_LISTEN_ADDR: ":8080"
+  GAME_BACKEND_URL: "http://realtime-api:18080"
   APP_ENV: "prod"
 ---
 apiVersion: apps/v1

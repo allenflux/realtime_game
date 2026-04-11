@@ -12,3 +12,4 @@ kubectl logs -n realtime deploy/realtime-frontend
 
 
 
+kubectl config set-context --current --namespace=crash-test
