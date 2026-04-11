@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: realtime-config
+  namespace: realtime
+data:
+  TZ: "Asia/Shanghai"
+
+  FRONTEND_PORT: "8080"
+  API_PORT: "8081"
+
+  # frontend 如果要访问 api，可以用集群内 service 名
+  API_BASE_URL: "http://realtime-api:18080"
+
+  # 根据你的程序实际读取的配置方式改
+  APP_ENV: "prod"

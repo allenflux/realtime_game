@@ -1,0 +1,67 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: realtime-api
+  namespace: realtime
+spec:
+  replicas: 2
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      app: realtime-api
+  template:
+    metadata:
+      labels:
+        app: realtime-api
+    spec:
+      containers:
+        - name: realtime-api
+          image: flxu/realtime_game:api-v0.0.1
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8081
+              name: http
+          envFrom:
+            - configMapRef:
+                name: realtime-config
+          env:
+            - name: TZ
+              valueFrom:
+                configMapKeyRef:
+                  name: realtime-config
+                  key: TZ
+          readinessProbe:
+            tcpSocket:
+              port: 8081
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          livenessProbe:
+            tcpSocket:
+              port: 8081
+            initialDelaySeconds: 15
+            periodSeconds: 20
+            timeoutSeconds: 3
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: "200m"
+              memory: "256Mi"
+            limits:
+              cpu: "1000m"
+              memory: "1Gi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: realtime-api
+  namespace: realtime
+spec:
+  selector:
+    app: realtime-api
+  ports:
+    - name: http
+      port: 8081
+      targetPort: 8081
+  type: ClusterIP

@@ -74,7 +74,7 @@ COPY --from=builder /app/realtime_game/etc /app/etc
 
 ENV TZ=Asia/Shanghai
 
-EXPOSE 8081
+EXPOSE 18080
 
 CMD ["/app/realtime_api"]
 

@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: realtime-worker
+  namespace: realtime
+spec:
+  replicas: 1
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      app: realtime-worker
+  template:
+    metadata:
+      labels:
+        app: realtime-worker
+    spec:
+      containers:
+        - name: realtime-worker
+          image: flxu/realtime_game:worker-v0.0.1
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - configMapRef:
+                name: realtime-config
+          env:
+            - name: TZ
+              valueFrom:
+                configMapKeyRef:
+                  name: realtime-config
+                  key: TZ
+          resources:
+            requests:
+              cpu: "200m"
+              memory: "256Mi"
+            limits:
+              cpu: "1000m"
+              memory: "1Gi"
