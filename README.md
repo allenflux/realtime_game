@@ -9,3 +9,6 @@ kubectl describe pod -n realtime
 kubectl logs -n realtime deploy/realtime-api
 kubectl logs -n realtime deploy/realtime-worker
 kubectl logs -n realtime deploy/realtime-frontend
+
+
+

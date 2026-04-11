@@ -76,7 +76,7 @@ ENV TZ=Asia/Shanghai
 
 EXPOSE 18080
 
-CMD ["/app/realtime_api"]
+CMD ["/app/realtime_api", "-f", "/app/etc/realtime-api.yaml"]
 
 
 # ========================
@@ -94,4 +94,4 @@ COPY --from=builder /app/realtime_game/etc /app/etc
 
 ENV TZ=Asia/Shanghai
 
-CMD ["/app/realtime_worker"]
+CMD ["/app/realtime_worker","-f", "/app/etc/realtime-worker.yaml"]
