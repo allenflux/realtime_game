@@ -14,7 +14,7 @@ RUN go mod download
 
 # ---- 再准备 frontend 子模块 ----
 COPY realtime_frontend/go.mod ./realtime_frontend/go.mod
-COPY realtime_frontend/go.sum ./realtime_frontend/go.sum
+#COPY realtime_frontend/go.sum ./realtime_frontend/go.sum
 WORKDIR /app/realtime_frontend
 RUN go mod download
 
