@@ -1,0 +1,21 @@
+CREATE TABLE `jackpot_record` (
+    `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    `channel_id` bigint(20) unsigned NOT NULL DEFAULT '0' COMMENT '游戏渠道ID',
+    `client_id` varchar(64) NOT NULL DEFAULT '' COMMENT '代理商ID',
+    `game_name` VARCHAR(30) NOT NULL DEFAULT '' COMMENT '游戏名称',
+    `term_id` INT(10) NOT NULL DEFAULT 0 COMMENT '游戏期数ID',
+    `ctime` bigint(20) NOT NULL DEFAULT 0 COMMENT '创建时间戳',
+    `end_time` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '期数结束时间',
+    `currency` VARCHAR(30) NOT NULL DEFAULT '' COMMENT '投注币种',
+    `valid_bet_amount` BIGINT(19) NOT NULL DEFAULT 0 COMMENT '有效投注金额*10,000',
+    `jackpot_in_amount` BIGINT(19) NOT NULL DEFAULT 0 COMMENT '计入奖池金额*10,000',
+    `jackpot_prize_1` BIGINT(19) NOT NULL DEFAULT 0 COMMENT '派奖金额1*10,000',
+    `jackpot_prize_2` BIGINT(19) NOT NULL DEFAULT 0 COMMENT '派奖金额2*10,000',
+    `jackpot_prize_3` BIGINT(19) NOT NULL DEFAULT 0 COMMENT '派奖金额3*10,000',
+    `jackpot_balance` BIGINT(19) NOT NULL DEFAULT 0 COMMENT '奖池余额*10,000',
+    `create_time` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `update_time` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (`id`),
+    KEY `uk_channel_game_currency_term` (`channel_id`, `game_name`, `currency`, `term_id`),
+    KEY `idx_channel_game_term` (`channel_id`, `game_name`, `term_id`)
+) COMMENT='奖池记录表';

@@ -1,0 +1,27 @@
+Name: realtime-api
+API:
+  Host: 0.0.0.0
+  Port: 18080
+Mysql:
+  DataSource: crash_admin:HYurRQDM$&n(Et7@tcp(api-sys-dev-rds.cluster-cre0080wclo2.ap-northeast-1.rds.amazonaws.com:3306)/crashv2?charset=utf8mb4&parseTime=true&loc=Asia%2FShanghai
+  GmDataSource: crash_admin:HYurRQDM$&n(Et7@tcp(api-sys-dev-rds.cluster-cre0080wclo2.ap-northeast-1.rds.amazonaws.com:3306)/gc_managerv2?charset=utf8mb4&parseTime=true&loc=Asia%2FShanghai
+
+Redis:
+  Host: crashv2-dev-redis-public-5734b924bd9b8572.elb.ap-northeast-1.amazonaws.com:6379
+  Type: node
+  Pass: ""
+ApiSys:
+  Host: "http://sys-api-backend-external-service.api-sys.svc.cluster.local:80"
+  Token: "Bearer qSlM4XHrS2e4ilPYcPnSI0yB4b4YabUKj1dIol0aJuS18WiaFdUZDG1mKSRxQnTJI"
+  Lang: en
+Runtime:
+  PreStartMs: 8000
+  StartingMs: 2000
+  CloseDelayMs: 5000
+  TickMs: 100
+  LeaseTTLSeconds: 15
+  LeaseRenewSeconds: 5
+  RetryIntervalSeconds: 5
+  RetryPageSize: 100
+  AutoCashoutBatchSize: 200
+  FinalizeSettlementPage: 500

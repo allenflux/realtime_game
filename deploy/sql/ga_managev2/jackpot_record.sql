@@ -1,0 +1,21 @@
+CREATE TABLE `jackpot_record` (
+                                  `id` bigint unsigned NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+                                  `channel_id` bigint unsigned NOT NULL DEFAULT '0' COMMENT '游戏渠道ID',
+                                  `client_id` varchar(64) NOT NULL DEFAULT '' COMMENT '代理商ID',
+                                  `game_name` varchar(30) NOT NULL DEFAULT '' COMMENT '游戏名称',
+                                  `term_id` int NOT NULL DEFAULT '0' COMMENT '游戏期数ID',
+                                  `ctime` bigint NOT NULL DEFAULT '0' COMMENT '创建时间戳',
+                                  `end_time` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '期数结束时间',
+                                  `currency` varchar(30) NOT NULL DEFAULT '' COMMENT '投注币种',
+                                  `valid_bet_amount` bigint NOT NULL DEFAULT '0' COMMENT '有效投注金额*10,000',
+                                  `jackpot_in_amount` bigint NOT NULL DEFAULT '0' COMMENT '计入奖池金额*10,000',
+                                  `jackpot_prize_1` bigint NOT NULL DEFAULT '0' COMMENT '派奖金额1*10,000',
+                                  `jackpot_prize_2` bigint NOT NULL DEFAULT '0' COMMENT '派奖金额2*10,000',
+                                  `jackpot_prize_3` bigint NOT NULL DEFAULT '0' COMMENT '派奖金额3*10,000',
+                                  `jackpot_balance` bigint NOT NULL DEFAULT '0' COMMENT '奖池余额*10,000',
+                                  `create_time` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+                                  `update_time` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+                                  PRIMARY KEY (`id`),
+                                  KEY `uk_channel_game_currency_term` (`channel_id`, `game_name`, `currency`, `term_id`),
+                                  KEY `idx_channel_game_term` (`channel_id`, `game_name`, `term_id`)
+) ENGINE = InnoDB AUTO_INCREMENT = 44755 DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '奖池记录表'
