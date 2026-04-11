@@ -15,9 +15,6 @@ COPY deploy ./deploy
 COPY model ./model
 COPY realtime_frontend ./realtime_frontend
 COPY realtime_game ./realtime_game
-COPY goctl.yaml ./
-COPY README.md ./
-COPY Interfere.md ./
 
 ENV CGO_ENABLED=0
 ENV GOOS=linux
