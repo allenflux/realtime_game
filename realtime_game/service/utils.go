@@ -10,7 +10,8 @@ import (
 	"fmt"
 	"math/rand"
 
-	"git.168tzi.com/cash/common/idMaker"
+	"crash/realtime_game/common"
+
 	"github.com/shopspring/decimal"
 )
 
@@ -32,7 +33,7 @@ func randUserSeed() string {
 }
 
 func nextOrderNo() string {
-	return fmt.Sprintf("%d", idMaker.GenerateId())
+	return fmt.Sprintf("%d", common.GenerateId())
 }
 
 func chooseBetType(snap *domain.RoundSnapshot) int64 {
