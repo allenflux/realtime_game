@@ -45,6 +45,9 @@ func (s *WorkerService) TickOne(ctx context.Context, channel *servermodel.Channe
 		current.Version = domain.NextVersion(current.Version)
 		changed = true
 	}
+	if current.State == domain.RoundStatePreStart {
+		_ = s.Services.runRobotBets(ctx, channel, current)
+	}
 	if current.State == domain.RoundStateStarting && nowMs >= current.FlyingStartAtMs {
 		current.State = domain.RoundStateFlying
 		current.Version = domain.NextVersion(current.Version)
@@ -56,7 +59,7 @@ func (s *WorkerService) TickOne(ctx context.Context, channel *servermodel.Channe
 		if nowMs >= current.CrashAtMs {
 			current.State = domain.RoundStateCrashed
 			current.IsCrashed = servermodel.CrashTermIsCrashedYes
-			current.CrashedAtMs = nowMs
+			current.CrashedAtMs = current.CrashAtMs
 			current.Version = domain.NextVersion(current.Version)
 			changed = true
 		}
@@ -68,7 +71,7 @@ func (s *WorkerService) TickOne(ctx context.Context, channel *servermodel.Channe
 		// 1. 先准时切状态
 		current.State = domain.RoundStateClosed
 		current.Version = domain.NextVersion(current.Version)
-		current.ClosedAtMs = nowMs
+		current.ClosedAtMs = current.CloseAtMs
 
 		_ = s.Ctx.SnapshotStore.SaveSnapshot(ctx, current)
 

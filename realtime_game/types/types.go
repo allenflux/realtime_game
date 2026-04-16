@@ -6,8 +6,7 @@ import "crash/realtime_game/domain"
 type CreateBetRequest struct {
 	RequestID           string `json:"request_id,omitempty"`
 	ChannelID           int64  `json:"channel_id"`
-	UserID              int64  `json:"user_id"`
-	UserName            string `json:"user_name"`
+	ApiSysToken         string `json:"api_sys_token"`
 	UserSeed            string `json:"user_seed,omitempty"`
 	Amount              string `json:"amount"`
 	Currency            string `json:"currency"`
@@ -26,7 +25,7 @@ type CreateBetResponse struct {
 // CashoutRequest 是手动兑现请求。
 type CashoutRequest struct {
 	RequestID      string `json:"request_id,omitempty"`
-	UserID         int64  `json:"user_id"`
+	ApiSysToken    string `json:"api_sys_token"`
 	OrderNo        string `json:"order_no"`
 	GamePlay       int64  `json:"game_play"`
 	SettlementMode int64  `json:"settlement_mode"`
@@ -50,4 +49,27 @@ type CashoutResponse struct {
 type CurrentRoundResponse struct {
 	*domain.RoundSnapshot
 	CurrentMultiple int64 `json:"current_multiple"`
+}
+
+type LeaderboardItem struct {
+	OrderNo    string `json:"order_no"`
+	UserName   string `json:"user_name"`
+	Payout     string `json:"payout"`
+	Multiplier string `json:"multiplier"`
+}
+
+type LeaderboardResponse struct {
+	Items []LeaderboardItem `json:"items"`
+}
+
+type JackpotResponse struct {
+	ChannelID      int64  `json:"channel_id"`
+	GameName       string `json:"game_name"`
+	Currency       string `json:"currency"`
+	TermID         int64  `json:"term_id"`
+	JackpotIn      string `json:"jackpot_in"`
+	JackpotPrize1  string `json:"jackpot_prize_1"`
+	JackpotPrize2  string `json:"jackpot_prize_2"`
+	JackpotPrize3  string `json:"jackpot_prize_3"`
+	JackpotBalance string `json:"jackpot_balance"`
 }

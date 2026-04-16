@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"flag"
+	"fmt"
 	"net/http"
 	"strconv"
 	"time"
@@ -45,6 +46,45 @@ func main() {
 		writeJSON(w, http.StatusOK, resp)
 	})
 
+	mux.HandleFunc("/v2/game/profile", func(w http.ResponseWriter, r *http.Request) {
+		token := r.URL.Query().Get("api_sys_token")
+		if token == "" {
+			writeError(w, http.StatusBadRequest, fmt.Errorf("api_sys_token required"))
+			return
+		}
+		userData, err := service.GetApiSysUserData(r.Context(), token, ctx)
+		if err != nil {
+			writeError(w, http.StatusUnauthorized, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, userData)
+	})
+
+	mux.HandleFunc("/v2/game/leaderboard", func(w http.ResponseWriter, r *http.Request) {
+		channelID, _ := strconv.ParseInt(r.URL.Query().Get("channel_id"), 10, 64)
+		resp, err := service.NewFeatureQueryService(svc).Leaderboard(r.Context(), channelID)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, resp)
+	})
+
+	mux.HandleFunc("/v2/game/jackpot", func(w http.ResponseWriter, r *http.Request) {
+		channelID, _ := strconv.ParseInt(r.URL.Query().Get("channel_id"), 10, 64)
+		currency := r.URL.Query().Get("currency")
+		resp, err := service.NewFeatureQueryService(svc).Jackpot(r.Context(), channelID, currency)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, err)
+			return
+		}
+		if resp == nil {
+			writeJSON(w, http.StatusNotFound, map[string]any{"message": "jackpot not found"})
+			return
+		}
+		writeJSON(w, http.StatusOK, resp)
+	})
+
 	mux.HandleFunc("/v2/game/bet", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			writeJSON(w, http.StatusMethodNotAllowed, map[string]any{"message": "method not allowed"})
@@ -82,14 +122,47 @@ func main() {
 	})
 
 	mux.HandleFunc("/v2/game/my-bets", func(w http.ResponseWriter, r *http.Request) {
-		channelID, _ := strconv.ParseInt(r.URL.Query().Get("channel_id"), 10, 64)
-		userID, _ := strconv.ParseInt(r.URL.Query().Get("user_id"), 10, 64)
-		limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
-		if limit <= 0 || limit > 200 {
+		ctxReq := r.Context()
+		channelIDStr := r.URL.Query().Get("channel_id")
+		channelID, err := strconv.ParseInt(channelIDStr, 10, 64)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, fmt.Errorf("invalid channel_id"))
+			return
+		}
+		currency := r.URL.Query().Get("currency")
+		token := r.URL.Query().Get("api_sys_token")
+		if token == "" {
+			writeError(w, http.StatusBadRequest, fmt.Errorf("api_sys_token required"))
+			return
+		}
+		limitStr := r.URL.Query().Get("limit")
+		limit, err := strconv.Atoi(limitStr)
+		if err != nil || limit <= 0 || limit > 200 {
 			limit = 50
 		}
-		start := time.Now().Add(-24 * time.Hour)
-		bets, err := ctx.BetModel.GetUserBets(r.Context(), userID, channelID, 0, start, time.Now(), limit, "")
+		userData, err := service.GetApiSysUserData(ctxReq, token, ctx)
+		if err != nil {
+			writeError(w, http.StatusUnauthorized, err)
+			return
+		}
+		if userData == nil {
+			writeError(w, http.StatusUnauthorized, fmt.Errorf("user not found"))
+			return
+		}
+
+		userID := userData.ID
+		now := time.Now()
+		start := now.Add(-24 * time.Hour)
+
+		bets, err := ctx.BetModel.GetUserBets(ctxReq,
+			userID,
+			channelID,
+			0,
+			start,
+			now,
+			limit,
+			currency,
+		)
 		if err != nil {
 			writeError(w, http.StatusInternalServerError, err)
 			return

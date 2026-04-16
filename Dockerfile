@@ -37,6 +37,7 @@ RUN go build -ldflags="-s -w" -o /out/realtime_frontend .
 WORKDIR /app
 RUN go build -ldflags="-s -w" -o /out/realtime_api ./realtime_game/cmd/realtime-api
 RUN go build -ldflags="-s -w" -o /out/realtime_worker ./realtime_game/cmd/realtime-worker
+RUN go build -ldflags="-s -w" -o /out/apisys_mock ./realtime_game/cmd/apisys-mock
 
 
 # ========================
@@ -95,3 +96,21 @@ COPY --from=builder /app/realtime_game/etc /app/etc
 ENV TZ=Asia/Shanghai
 
 CMD ["/app/realtime_worker","-f", "/app/etc/realtime-worker.yaml"]
+
+
+# ========================
+# apisys mock image
+# ========================
+FROM alpine:3.20 AS apisys-mock
+
+RUN apk add --no-cache ca-certificates tzdata
+
+WORKDIR /app
+
+COPY --from=builder /out/apisys_mock /app/apisys_mock
+
+ENV TZ=Asia/Shanghai
+
+EXPOSE 19090
+
+CMD ["/app/apisys_mock"]

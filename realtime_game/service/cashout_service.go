@@ -19,8 +19,11 @@ func (s *CashoutService) Cashout(ctx context.Context, req *rttypes.CashoutReques
 	if req == nil {
 		return nil, errors.New("请求不能为空")
 	}
-	if req.OrderNo == "" || req.UserID <= 0 {
-		return nil, errors.New("order_no 或 user_id 非法")
+	//if req.OrderNo == "" || req.UserID <= 0 {
+	//	return nil, errors.New("order_no 或 user_id 非法")
+	//}
+	if req.OrderNo == "" || len(req.ApiSysToken) <= 0 {
+		return nil, errors.New("order_no 或 token 非法")
 	}
 
 	lockOK, err := s.Ctx.SnapshotStore.AcquireOpLock(ctx, "cashout:"+req.OrderNo, 5)
@@ -35,14 +38,19 @@ func (s *CashoutService) Cashout(ctx context.Context, req *rttypes.CashoutReques
 	if err != nil || bet == nil {
 		return nil, errors.New("订单不存在")
 	}
-	if bet.UserId != req.UserID {
+	apiSysUserData, err := getApiSysUserData(ctx, req.ApiSysToken, s.Ctx)
+	if err != nil {
+		return nil, err
+	}
+	if bet.UserId != apiSysUserData.ID {
 		return nil, errors.New("不能操作他人订单")
 	}
 	if bet.OrderStatus != servermodel.OrderStatusCreated && bet.OrderStatus != servermodel.OrderStatusCashingOut {
 		return nil, errors.New("当前订单状态不可兑现")
 	}
 
-	snap, err := s.Ctx.SnapshotStore.GetSnapshot(ctx, bet.ChannelId)
+	runtimeChannelID := betRuntimeChannelID(bet)
+	snap, err := s.Ctx.SnapshotStore.GetSnapshot(ctx, runtimeChannelID)
 	if err != nil {
 		return nil, err
 	}
@@ -53,7 +61,7 @@ func (s *CashoutService) Cashout(ctx context.Context, req *rttypes.CashoutReques
 		return nil, errors.New("本局已结束，不能手动兑现")
 	}
 
-	channel, err := s.Ctx.ChannelModel.FindOne(ctx, bet.ChannelId)
+	channel, err := s.Ctx.ChannelModel.FindOne(ctx, runtimeChannelID)
 	if err != nil {
 		return nil, err
 	}
@@ -107,10 +115,12 @@ func (s *CashoutService) cashoutRolling(ctx context.Context, bet *servermodel.Be
 		Metadata:       domain.BuildBetMetadata(bet),
 		IsSystemReward: false,
 	})
-	if err != nil {
-		_ = s.addCashoutRetry(ctx, bet)
-		_ = s.Ctx.BetModel.UpdateById(ctx, bet.Id, map[string]any{servermodel.Bet_F_order_status: servermodel.OrderStatusOverRetry})
-		return nil, err
+	if !isRobotBet(bet) {
+		if err != nil {
+			_ = s.addCashoutRetry(ctx, bet)
+			_ = s.Ctx.BetModel.UpdateById(ctx, bet.Id, map[string]any{servermodel.Bet_F_order_status: servermodel.OrderStatusOverRetry})
+			return nil, err
+		}
 	}
 
 	if err := s.markBetSettled(ctx, bet, payout); err != nil {
@@ -150,7 +160,7 @@ func (s *CashoutService) cashoutPreHalf(ctx context.Context, bet *servermodel.Be
 		Metadata:       domain.BuildBetMetadataWithHalf(bet, true),
 		IsSystemReward: false,
 	}, true, 0)
-	if err != nil {
+	if !isRobotBet(bet) && err != nil {
 		_ = s.addCashoutRetry(ctx, bet)
 		return nil, err
 	}
@@ -190,7 +200,7 @@ func (s *CashoutService) cashoutPreAll(ctx context.Context, bet *servermodel.Bet
 		Metadata:       domain.BuildBetMetadata(bet),
 		IsSystemReward: false,
 	}, false, partialCount)
-	if err != nil {
+	if !isRobotBet(bet) && err != nil {
 		_ = s.addCashoutRetry(ctx, bet)
 		_ = s.Ctx.BetModel.UpdateById(ctx, bet.Id, map[string]any{servermodel.Bet_F_order_status: servermodel.OrderStatusOverRetry})
 		return nil, err
@@ -210,11 +220,12 @@ func (s *CashoutService) markBetSettled(ctx context.Context, bet *servermodel.Be
 	}); err != nil {
 		return err
 	}
-	_ = s.Ctx.SnapshotStore.RemoveAutoCashout(ctx, bet.ChannelId, bet.ApiOrderNo)
+	runtimeChannelID := betRuntimeChannelID(bet)
+	_ = s.Ctx.SnapshotStore.RemoveAutoCashout(ctx, runtimeChannelID, bet.ApiOrderNo)
 	hot := &domain.BetHotState{
 		BetID:        bet.Id,
 		OrderNo:      bet.ApiOrderNo,
-		ChannelID:    bet.ChannelId,
+		ChannelID:    runtimeChannelID,
 		TermID:       bet.TermId,
 		UserID:       bet.UserId,
 		GamePlay:     bet.GamePlay,
@@ -224,9 +235,9 @@ func (s *CashoutService) markBetSettled(ctx context.Context, bet *servermodel.Be
 		AutoTarget:   bet.AutoCashoutMultiple,
 		ManualTarget: bet.ManualCashoutMultiple,
 	}
-	_ = s.Ctx.SnapshotStore.SaveBetHot(ctx, bet.ChannelId, hot)
+	_ = s.Ctx.SnapshotStore.SaveBetHot(ctx, runtimeChannelID, hot)
 
-	snap, err := s.Ctx.SnapshotStore.GetSnapshot(ctx, bet.ChannelId)
+	snap, err := s.Ctx.SnapshotStore.GetSnapshot(ctx, runtimeChannelID)
 	if err == nil && snap != nil && snap.TermID == bet.TermId {
 		snap.CashedAmt += payout
 		if payout > 0 && (snap.MaxMultiple == 0 || bet.ManualCashoutMultiple > snap.MaxMultiple) {
@@ -236,6 +247,7 @@ func (s *CashoutService) markBetSettled(ctx context.Context, bet *servermodel.Be
 		snap.Version = domain.NextVersion(snap.Version)
 		_ = s.Ctx.SnapshotStore.SaveSnapshot(ctx, snap)
 	}
+	s.Services.Hooks.OnBetSettled(ctx, bet, payout)
 	return nil
 }
 

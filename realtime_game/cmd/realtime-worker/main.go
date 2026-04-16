@@ -28,24 +28,46 @@ var (
 )
 
 func runChannelLoop(ctx context.Context, svc *service.Services, channelID int64, workerID string) {
-	ticker := time.NewTicker(100 * time.Millisecond)
-	defer ticker.Stop()
-
 	workerSvc := service.NewWorkerService(svc)
+	interval := time.Duration(svc.Ctx.Config.Runtime.TickMs) * time.Millisecond
+	if interval <= 0 {
+		interval = 100 * time.Millisecond
+	}
+	nextTick := time.Now()
 
 	for {
+		now := time.Now()
+		if now.Before(nextTick) {
+			timer := time.NewTimer(time.Until(nextTick))
+			select {
+			case <-ctx.Done():
+				timer.Stop()
+				return
+			case <-timer.C:
+			}
+		} else {
+			lag := now.Sub(nextTick)
+			if lag > interval {
+				skips := lag / interval
+				nextTick = nextTick.Add((skips + 1) * interval)
+			} else {
+				nextTick = nextTick.Add(interval)
+			}
+		}
+
 		select {
 		case <-ctx.Done():
 			return
-		case <-ticker.C:
-			ch, err := svc.Ctx.ChannelModel.FindOne(ctx, channelID)
-			if err != nil || ch == nil {
-				continue
-			}
+		default:
+		}
 
-			if err := workerSvc.TickOne(ctx, ch, workerID); err != nil {
-				logx.Errorf("tick channel=%d err=%v", channelID, err)
-			}
+		ch, err := svc.Ctx.ChannelModel.FindOne(ctx, channelID)
+		if err != nil || ch == nil {
+			continue
+		}
+
+		if err := workerSvc.TickOne(ctx, ch, workerID); err != nil {
+			logx.Errorf("tick channel=%d err=%v", channelID, err)
 		}
 	}
 }
@@ -90,6 +112,9 @@ func main() {
 			active := map[int64]struct{}{}
 
 			for _, ch := range channels {
+				if !service.ShouldRunRuntimeChannel(ch) {
+					continue
+				}
 				active[ch.Id] = struct{}{}
 
 				mu.Lock()

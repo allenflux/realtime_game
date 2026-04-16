@@ -38,6 +38,8 @@ type (
 		Id                         int64         `db:"id"`                            // 自增主键ID
 		ApiOrderNo                 string        `db:"api_order_no"`                  // apisys 订单号
 		ChannelId                  int64         `db:"channel_id"`                    // 渠道id@channel.id
+		RealChannelId              int64         `db:"real_channel_id"`               // 真实渠道ID
+		RuntimeChannelId           int64         `db:"runtime_channel_id"`            // 运行局渠道ID(98/99)
 		TermId                     int64         `db:"term_id"`                       // 游戏期数ID
 		UserId                     int64         `db:"user_id"`                       // 用户ID
 		UserName                   string        `db:"user_name"`                     // 用户名
@@ -94,14 +96,14 @@ func (m *defaultBetModel) FindOne(ctx context.Context, id int64) (*Bet, error) {
 }
 
 func (m *defaultBetModel) Insert(ctx context.Context, data *Bet) (sql.Result, error) {
-	query := fmt.Sprintf("insert into %s (%s) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", m.table, betRowsExpectAutoSet)
-	ret, err := m.conn.ExecCtx(ctx, query, data.ApiOrderNo, data.ChannelId, data.TermId, data.UserId, data.UserName, data.UserSeed, data.BetType, data.Amount, data.Currency, data.AutoCashoutMultiple, data.ManualCashoutMultiple, data.BetAtMultiple, data.ServiceFee, data.Rake, data.RakeAmt, data.CashedOutAmount, data.OrderStatus, data.InRetry, data.Ctime, data.GamePlay, data.BonusBetId, data.ManualCashoutTimes, data.FirstCashoutAmount, data.FirstManualCashoutMultiple, data.IsCashoutAmountMerged)
+	query := fmt.Sprintf("insert into %s (%s) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", m.table, betRowsExpectAutoSet)
+	ret, err := m.conn.ExecCtx(ctx, query, data.ApiOrderNo, data.ChannelId, data.RealChannelId, data.RuntimeChannelId, data.TermId, data.UserId, data.UserName, data.UserSeed, data.BetType, data.Amount, data.Currency, data.AutoCashoutMultiple, data.ManualCashoutMultiple, data.BetAtMultiple, data.ServiceFee, data.Rake, data.RakeAmt, data.CashedOutAmount, data.OrderStatus, data.InRetry, data.Ctime, data.GamePlay, data.BonusBetId, data.ManualCashoutTimes, data.FirstCashoutAmount, data.FirstManualCashoutMultiple, data.IsCashoutAmountMerged)
 	return ret, err
 }
 
 func (m *defaultBetModel) Update(ctx context.Context, data *Bet) error {
 	query := fmt.Sprintf("update %s set %s where `id` = ?", m.table, betRowsWithPlaceHolder)
-	_, err := m.conn.ExecCtx(ctx, query, data.ApiOrderNo, data.ChannelId, data.TermId, data.UserId, data.UserName, data.UserSeed, data.BetType, data.Amount, data.Currency, data.AutoCashoutMultiple, data.ManualCashoutMultiple, data.BetAtMultiple, data.ServiceFee, data.Rake, data.RakeAmt, data.CashedOutAmount, data.OrderStatus, data.InRetry, data.Ctime, data.GamePlay, data.BonusBetId, data.ManualCashoutTimes, data.FirstCashoutAmount, data.FirstManualCashoutMultiple, data.IsCashoutAmountMerged, data.Id)
+	_, err := m.conn.ExecCtx(ctx, query, data.ApiOrderNo, data.ChannelId, data.RealChannelId, data.RuntimeChannelId, data.TermId, data.UserId, data.UserName, data.UserSeed, data.BetType, data.Amount, data.Currency, data.AutoCashoutMultiple, data.ManualCashoutMultiple, data.BetAtMultiple, data.ServiceFee, data.Rake, data.RakeAmt, data.CashedOutAmount, data.OrderStatus, data.InRetry, data.Ctime, data.GamePlay, data.BonusBetId, data.ManualCashoutTimes, data.FirstCashoutAmount, data.FirstManualCashoutMultiple, data.IsCashoutAmountMerged, data.Id)
 	return err
 }
 

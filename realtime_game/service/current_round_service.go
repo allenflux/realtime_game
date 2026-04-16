@@ -15,7 +15,12 @@ func NewCurrentRoundService(s *Services) *CurrentRoundService {
 }
 
 func (s *CurrentRoundService) Get(ctx context.Context, channelID int64) (*rttypes.CurrentRoundResponse, error) {
-	snap, err := s.Ctx.SnapshotStore.GetSnapshot(ctx, channelID)
+	pair, err := resolveRuntimeChannel(ctx, s.Services, channelID)
+	if err != nil {
+		return nil, err
+	}
+
+	snap, err := s.Ctx.SnapshotStore.GetSnapshot(ctx, pair.Runtime.Id)
 	if err != nil {
 		return nil, err
 	}

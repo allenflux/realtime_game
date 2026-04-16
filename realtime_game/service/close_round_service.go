@@ -101,17 +101,28 @@ func (s *CloseRoundService) finalizePendingBets(ctx context.Context, snap *domai
 	}
 
 	if len(zeroReqs) > 0 {
-		suc, fail, err := s.Ctx.Settlement.BatchBill(ctx, zeroReqs)
-		if err != nil {
-			_ = err
-		}
 		sucMap := map[string]struct{}{}
-		for _, no := range suc {
-			sucMap[no] = struct{}{}
-		}
 		failMap := map[string]struct{}{}
-		for _, no := range fail {
-			failMap[no] = struct{}{}
+		humanReqs := make([]settlement.BillRequest, 0, len(zeroReqs))
+		for _, req := range zeroReqs {
+			bet, _ := s.Ctx.BetModel.GetByApiOrderNo(ctx, req.OrderNo)
+			if isRobotBet(bet) {
+				sucMap[req.OrderNo] = struct{}{}
+				continue
+			}
+			humanReqs = append(humanReqs, req)
+		}
+		if len(humanReqs) > 0 {
+			suc, fail, err := s.Ctx.Settlement.BatchBill(ctx, humanReqs)
+			if err != nil {
+				_ = err
+			}
+			for _, no := range suc {
+				sucMap[no] = struct{}{}
+			}
+			for _, no := range fail {
+				failMap[no] = struct{}{}
+			}
 		}
 		for _, bet := range bets {
 			if _, ok := sucMap[bet.ApiOrderNo]; ok {
@@ -127,6 +138,10 @@ func (s *CloseRoundService) finalizePendingBets(ctx context.Context, snap *domai
 				})
 			}
 		}
+	}
+	runtimeChannel, _ := s.Ctx.ChannelModel.FindOne(ctx, snap.ChannelID)
+	if runtimeChannel != nil {
+		_ = s.Services.Hooks.OnRoundClosed(ctx, runtimeChannel, snap)
 	}
 	return nil
 }

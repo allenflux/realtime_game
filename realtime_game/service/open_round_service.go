@@ -30,6 +30,7 @@ func (s *OpenRoundService) OpenIfNeeded(ctx context.Context, channel *servermode
 	nowMs := time.Now().UnixMilli()
 	ctime := time.Now().Unix()
 
+	applyRiskControl(channel)
 	crashMultiple := channel.NextRandMultiple
 	if crashMultiple <= 0 || channel.NextRandMultipleUsed == servermodel.CHANNEL_next_rand_multiple_used_yes {
 		crashMultiple = domain.RandCrashMultiple(channel.Divisor, channel.CtrlCoef, channel.MaxCashoutMultiple)

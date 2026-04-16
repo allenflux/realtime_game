@@ -60,6 +60,8 @@ func main() {
 	mux.HandleFunc("/", app.indexHandler)
 	mux.HandleFunc("/api/config", app.configHandler)
 	mux.HandleFunc("/api/proxy/current-round", app.proxyGet)
+	mux.HandleFunc("/api/proxy/leaderboard", app.proxyGet)
+	mux.HandleFunc("/api/proxy/jackpot", app.proxyGet)
 	mux.HandleFunc("/api/proxy/my-bets", app.proxyGet)
 	mux.HandleFunc("/api/proxy/bet", app.proxyPost)
 	mux.HandleFunc("/api/proxy/cashout", app.proxyPost)
@@ -78,11 +80,16 @@ func main() {
 func (a *App) indexHandler(w http.ResponseWriter, r *http.Request) {
 	channelID, _ := strconv.ParseInt(r.URL.Query().Get("channel_id"), 10, 64)
 	if channelID <= 0 {
-		channelID = 19999
+		channelID = 1001
+	}
+	token := strings.TrimSpace(r.URL.Query().Get("api_sys_token"))
+	if token == "" {
+		token = "token-demo-1"
 	}
 
 	err := a.templates.ExecuteTemplate(w, "index.html", map[string]any{
-		"ChannelID": channelID,
+		"ChannelID":   channelID,
+		"ApiSysToken": token,
 	})
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -159,6 +166,12 @@ func mapProxyPath(p string) string {
 	switch path.Clean(p) {
 	case "/api/proxy/current-round":
 		return "/v2/game/current-round"
+	case "/api/proxy/profile":
+		return "/v2/game/profile"
+	case "/api/proxy/leaderboard":
+		return "/v2/game/leaderboard"
+	case "/api/proxy/jackpot":
+		return "/v2/game/jackpot"
 	case "/api/proxy/my-bets":
 		return "/v2/game/my-bets"
 	case "/api/proxy/bet":

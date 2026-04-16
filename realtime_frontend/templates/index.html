@@ -3,110 +3,260 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Realtime Game 控制台</title>
+  <title>Crash</title>
   <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
-  <div class="page">
-    <header class="header card">
-      <div>
-        <h1>Realtime Game 前端控制台</h1>
-        <p>基于 current-round 拉取模式，本地计算倍率与倒计时。pre_start 和 flying 阶段都允许下注。</p>
+  <div class="shell">
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark">C</div>
+        <div>
+          <h1>Crash</h1>
+          <p>Rocket cashout arena</p>
+        </div>
       </div>
-      <div class="header-actions">
-        <label>
-          渠道ID
+
+      <div class="topbar-tools">
+        <label class="compact-field">
+          <span>Channel</span>
           <input id="channelId" type="number" value="{{.ChannelID}}" min="1">
         </label>
-        <button id="reloadBtn" class="primary" type="button">刷新局状态</button>
+        <label class="compact-field token-field">
+          <span>API SYS Token</span>
+          <input id="apiSysToken" type="text" value="{{.ApiSysToken}}">
+        </label>
+        <button id="applyUrlBtn" class="ghost" type="button">更新 URL</button>
+        <button id="reloadBtn" class="primary" type="button">同步状态</button>
       </div>
     </header>
 
-    <main class="grid">
-      <section class="card hero">
-        <div class="hero-left">
-          <div class="state-pill" id="roundState">--</div>
-          <div class="multiple-wrap">
-            <div class="multiple-label">当前倍率</div>
-            <div class="multiple-value" id="currentMultiple">1.00x</div>
+    <main class="layout">
+      <section class="arena-panel">
+        <div class="arena-head">
+          <div class="user-card">
+            <div class="user-chip" id="profileBadge">Guest</div>
+            <div class="user-meta">
+              <strong id="profileName">Loading...</strong>
+              <span id="profileId">--</span>
+            </div>
           </div>
-          <div class="time-grid">
-            <div><span>服务端时间</span><strong id="serverTime">--</strong></div>
-            <div><span>爆炸倒计时</span><strong id="countdown">--</strong></div>
-            <div><span>本局ID</span><strong id="roundId">--</strong></div>
-            <div><span>版本号</span><strong id="version">--</strong></div>
-            <div><span>可下注</span><strong id="canBet">--</strong></div>
-            <div><span>可兑现</span><strong id="canCashout">--</strong></div>
+
+          <div class="round-meta">
+            <div><span>Round</span><strong id="roundId">--</strong></div>
+            <div><span>State</span><strong id="roundState">--</strong></div>
+            <div><span>Countdown</span><strong id="countdown">--</strong></div>
           </div>
         </div>
-        <div class="hero-right">
-          <pre id="roundSnapshot" class="json-box">{}</pre>
+
+        <div class="history-strip">
+          <div class="history-title">Recent Crashes</div>
+          <div id="historyStrip" class="history-list"></div>
+        </div>
+
+        <div class="arena-stage">
+          <div class="stage-glow"></div>
+          <div class="sky-grid"></div>
+          <canvas id="flightCanvas" class="flight-canvas" width="1200" height="620" aria-hidden="true"></canvas>
+          <svg class="flight-svg" viewBox="0 0 1000 520" preserveAspectRatio="none" aria-hidden="true">
+            <defs>
+              <linearGradient id="trailStroke" x1="0%" y1="100%" x2="100%" y2="0%">
+                <stop offset="0%" stop-color="#f97316" stop-opacity="0.15"></stop>
+                <stop offset="50%" stop-color="#fb7185" stop-opacity="0.7"></stop>
+                <stop offset="100%" stop-color="#38bdf8" stop-opacity="1"></stop>
+              </linearGradient>
+            </defs>
+            <path id="flightTrail" class="trail-base" d=""></path>
+            <path id="flightTrailGlow" class="trail-glow" d=""></path>
+          </svg>
+          <div id="rocketShip" class="rocket">🚀</div>
+          <div class="arena-center">
+            <div class="multiple-caption">Current Multiplier</div>
+            <div id="currentMultiple" class="multiple-number">1.00x</div>
+            <div id="statusLine" class="status-line">Waiting for launch</div>
+          </div>
+          <div class="stage-stats">
+            <div><span>Server</span><strong id="serverTime">--</strong></div>
+            <div><span>Version</span><strong id="version">--</strong></div>
+            <div><span>Bet</span><strong id="canBet">--</strong></div>
+            <div><span>Cashout</span><strong id="canCashout">--</strong></div>
+          </div>
+        </div>
+
+        <div class="bet-columns">
+          <section class="bet-card">
+            <div class="card-head">
+              <h2>Bet Panel A</h2>
+              <span class="pill pill-green">Lane A</span>
+            </div>
+            <div class="quick-chips">
+              <button class="chip-btn" type="button" data-target-form="betFormA" data-amount="5.00">5</button>
+              <button class="chip-btn" type="button" data-target-form="betFormA" data-amount="10.00">10</button>
+              <button class="chip-btn" type="button" data-target-form="betFormA" data-amount="25.00">25</button>
+              <button class="chip-btn" type="button" data-target-form="betFormA" data-amount="50.00">50</button>
+            </div>
+            <form id="betFormA" class="bet-form" data-panel="A">
+              <label>
+                <span>Amount</span>
+                <input name="amount" type="text" value="10.00" required>
+              </label>
+              <label>
+                <span>Currency</span>
+                <input name="currency" type="text" value="USD" required>
+              </label>
+              <label>
+                <span>Auto Cashout</span>
+                <input name="auto_cashout_multiple" type="text" value="2.00" required>
+              </label>
+              <label>
+                <span>Mode</span>
+                <select name="game_play">
+                  <option value="0">Rolling</option>
+                  <option value="1">Pre Match</option>
+                </select>
+              </label>
+              <label class="full-span">
+                <span>User Seed</span>
+                <input name="user_seed" type="text" value="">
+              </label>
+              <button class="primary full-span bet-submit-btn" type="submit">Launch Bet A</button>
+            </form>
+            <pre id="betResultA" class="result-box"></pre>
+          </section>
+
+          <section class="bet-card">
+            <div class="card-head">
+              <h2>Bet Panel B</h2>
+              <span class="pill pill-blue">Lane B</span>
+            </div>
+            <div class="quick-chips">
+              <button class="chip-btn" type="button" data-target-form="betFormB" data-amount="5.00">5</button>
+              <button class="chip-btn" type="button" data-target-form="betFormB" data-amount="10.00">10</button>
+              <button class="chip-btn" type="button" data-target-form="betFormB" data-amount="25.00">25</button>
+              <button class="chip-btn" type="button" data-target-form="betFormB" data-amount="50.00">50</button>
+            </div>
+            <form id="betFormB" class="bet-form" data-panel="B">
+              <label>
+                <span>Amount</span>
+                <input name="amount" type="text" value="20.00" required>
+              </label>
+              <label>
+                <span>Currency</span>
+                <input name="currency" type="text" value="USD" required>
+              </label>
+              <label>
+                <span>Auto Cashout</span>
+                <input name="auto_cashout_multiple" type="text" value="3.00" required>
+              </label>
+              <label>
+                <span>Mode</span>
+                <select name="game_play">
+                  <option value="0">Rolling</option>
+                  <option value="1">Pre Match</option>
+                </select>
+              </label>
+              <label class="full-span">
+                <span>User Seed</span>
+                <input name="user_seed" type="text" value="">
+              </label>
+              <button class="primary full-span bet-submit-btn" type="submit">Launch Bet B</button>
+            </form>
+            <pre id="betResultB" class="result-box"></pre>
+          </section>
+
+          <section class="bet-card">
+            <div class="card-head">
+              <h2>Cashout</h2>
+              <span class="pill pill-amber">Manual Exit</span>
+            </div>
+            <form id="cashoutForm" class="bet-form">
+              <label class="full-span">
+                <span>Order No</span>
+                <input name="order_no" type="text" placeholder="Click an order below">
+              </label>
+              <label>
+                <span>Mode</span>
+                <select name="game_play">
+                  <option value="0">Rolling</option>
+                  <option value="1">Pre Match</option>
+                </select>
+              </label>
+              <label>
+                <span>Settlement</span>
+                <select name="settlement_mode">
+                  <option value="0">Half</option>
+                  <option value="1">All</option>
+                </select>
+              </label>
+              <button id="cashoutSubmitBtn" class="warning full-span" type="submit">Cashout Now</button>
+            </form>
+            <pre id="cashoutResult" class="result-box"></pre>
+          </section>
+
+          <section class="bet-card">
+            <div class="card-head">
+              <h2>Flight Ops</h2>
+              <span class="pill">Helpers</span>
+            </div>
+            <div class="ops-grid">
+              <button id="copyTopOrderBtn" class="ghost" type="button">Use Latest Order</button>
+              <button id="syncAllBtn" class="ghost" type="button">Refresh All</button>
+              <div class="ops-hint">Tip: click any order row to preload cashout. Two bet lanes let you stage different auto cashout strategies.</div>
+            </div>
+            <pre id="opsResult" class="result-box"></pre>
+          </section>
         </div>
       </section>
 
-      <section class="card">
-        <h2>下注</h2>
-        <form id="betForm" class="form-grid">
-          <label>用户ID<input name="user_id" type="number" value="10001" required></label>
-          <label>用户名<input name="user_name" type="text" value="tester" required></label>
-          <label>金额<input name="amount" type="text" value="10" required></label>
-          <label>币种<input name="currency" type="text" value="CNY" required></label>
-          <label>自动兑现倍数<input name="auto_cashout_multiple" type="text" value="2.00" required></label>
-          <label>玩法
-            <select name="game_play">
-              <option value="0">滚盘</option>
-              <option value="1">赛前盘</option>
-            </select>
-          </label>
-          <label class="wide">用户种子<input name="user_seed" type="text" value=""></label>
-          <button id="betSubmitBtn" type="submit" class="primary">提交下注</button>
-        </form>
-        <pre id="betResult" class="json-box slim"></pre>
-      </section>
-
-      <section class="card">
-        <h2>手动兑现</h2>
-        <form id="cashoutForm" class="form-grid">
-          <label>用户ID<input name="user_id" type="number" value="10001" required></label>
-          <label>订单号<input name="order_no" type="text" placeholder="下注成功后自动带入" required></label>
-          <label>玩法
-            <select name="game_play">
-              <option value="0">滚盘</option>
-              <option value="1">赛前盘</option>
-            </select>
-          </label>
-          <label>结算方式
-            <select name="all_settlement">
-              <option value="0">半兑</option>
-              <option value="1">全兑</option>
-            </select>
-          </label>
-          <button id="cashoutSubmitBtn" type="submit" class="warning">提交兑现</button>
-        </form>
-        <pre id="cashoutResult" class="json-box slim"></pre>
-      </section>
-
-      <section class="card wide-card">
-        <div class="section-head">
-          <h2>我的订单</h2>
-          <div class="inline-tools">
-            <label>用户ID<input id="queryUserId" type="number" value="10001"></label>
-            <button id="queryBetsBtn" type="button">查询</button>
+      <aside class="sidebar">
+        <section class="side-card">
+          <div class="card-head">
+            <h2>Jackpot</h2>
+            <span class="pill pill-blue">Live Pool</span>
           </div>
+          <div class="jackpot-balance" id="jackpotBalance">--</div>
+          <div class="jackpot-grid">
+            <div><span>1st</span><strong id="jackpotPrize1">--</strong></div>
+            <div><span>2nd</span><strong id="jackpotPrize2">--</strong></div>
+            <div><span>3rd</span><strong id="jackpotPrize3">--</strong></div>
+            <div><span>In</span><strong id="jackpotIn">--</strong></div>
+          </div>
+        </section>
+
+        <section class="side-card">
+          <div class="card-head">
+            <h2>Top Escapes</h2>
+            <span class="pill pill-red">Leaderboard</span>
+          </div>
+          <div id="leaderboard" class="leaderboard-list"></div>
+        </section>
+
+        <section class="side-card">
+          <div class="card-head">
+            <h2>Flight Data</h2>
+            <span class="pill">Debug</span>
+          </div>
+          <pre id="roundSnapshot" class="snapshot-box">{}</pre>
+        </section>
+      </aside>
+
+      <section class="table-panel">
+        <div class="card-head table-head">
+          <h2>My Bets</h2>
+          <button id="queryBetsBtn" class="ghost" type="button">Refresh Bets</button>
         </div>
         <div class="table-wrap">
           <table id="betsTable">
             <thead>
               <tr>
-                <th>订单号</th>
-                <th>用户ID</th>
-                <th>金额</th>
-                <th>下注倍数</th>
-                <th>自动兑倍数</th>
-                <th>手动兑倍数</th>
-                <th>已兑金额</th>
-                <th>状态</th>
-                <th>玩法</th>
+                <th>Order</th>
+                <th>Amount</th>
+                <th>Bet At</th>
+                <th>Auto</th>
+                <th>Manual</th>
+                <th>Payout</th>
+                <th>Status</th>
+                <th>Mode</th>
               </tr>
             </thead>
             <tbody></tbody>
@@ -114,8 +264,10 @@
         </div>
       </section>
 
-      <section class="card wide-card">
-        <h2>操作日志</h2>
+      <section class="log-panel">
+        <div class="card-head">
+          <h2>Mission Log</h2>
+        </div>
         <div id="logs" class="logs"></div>
       </section>
     </main>
@@ -123,7 +275,8 @@
 
   <script>
     window.__APP_INIT__ = {
-      channelID: {{.ChannelID}}
+      channelID: {{.ChannelID}},
+      apiSysToken: {{printf "%q" .ApiSysToken}}
     };
   </script>
   <script src="/static/js/app.js"></script>

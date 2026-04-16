@@ -30,28 +30,30 @@ func (s *RetryService) retryCashoutOne(ctx context.Context, task *servermodel.Re
 		return err
 	}
 	var billErr error
-	if bet.GamePlay == domain.GamePlayPreMatch {
-		partialCount := int8(0)
-		if bet.FirstCashoutAmount > 0 {
-			partialCount = 1
+	if !isRobotBet(bet) {
+		if bet.GamePlay == domain.GamePlayPreMatch {
+			partialCount := int8(0)
+			if bet.FirstCashoutAmount > 0 {
+				partialCount = 1
+			}
+			billErr = s.Ctx.Settlement.BillPreMatch(ctx, settlement.BillRequest{
+				ChannelID: bet.ChannelId,
+				UserID:    bet.UserId,
+				OrderNo:   bet.ApiOrderNo,
+				Currency:  bet.Currency,
+				Amount:    domain.DBAmountToString(bet.CashedOutAmount),
+				Metadata:  domain.BuildBetMetadata(bet),
+			}, false, partialCount)
+		} else {
+			billErr = s.Ctx.Settlement.BillRolling(ctx, settlement.BillRequest{
+				ChannelID: bet.ChannelId,
+				UserID:    bet.UserId,
+				OrderNo:   bet.ApiOrderNo,
+				Currency:  bet.Currency,
+				Amount:    domain.DBAmountToString(bet.CashedOutAmount),
+				Metadata:  domain.BuildBetMetadata(bet),
+			})
 		}
-		billErr = s.Ctx.Settlement.BillPreMatch(ctx, settlement.BillRequest{
-			ChannelID: bet.ChannelId,
-			UserID:    bet.UserId,
-			OrderNo:   bet.ApiOrderNo,
-			Currency:  bet.Currency,
-			Amount:    domain.DBAmountToString(bet.CashedOutAmount),
-			Metadata:  domain.BuildBetMetadata(bet),
-		}, false, partialCount)
-	} else {
-		billErr = s.Ctx.Settlement.BillRolling(ctx, settlement.BillRequest{
-			ChannelID: bet.ChannelId,
-			UserID:    bet.UserId,
-			OrderNo:   bet.ApiOrderNo,
-			Currency:  bet.Currency,
-			Amount:    domain.DBAmountToString(bet.CashedOutAmount),
-			Metadata:  domain.BuildBetMetadata(bet),
-		})
 	}
 	if billErr != nil {
 		task.RetryNum += 1
@@ -82,17 +84,19 @@ func (s *RetryService) retryRefundOne(ctx context.Context, task *servermodel.Ret
 	if err != nil || bet == nil {
 		return err
 	}
-	if err := s.Ctx.Settlement.Refund(ctx, settlement.RefundRequest{
-		ChannelID: bet.ChannelId,
-		OrderNo:   bet.ApiOrderNo,
-		Metadata:  domain.BuildBetMetadata(bet),
-	}); err != nil {
-		task.RetryNum += 1
-		task.NextRetryTime = time.Now().Unix() + 5
-		if task.RetryNum >= 20 {
-			task.Status = servermodel.RetryRefundTask_Status_close
+	if !isRobotBet(bet) {
+		if err := s.Ctx.Settlement.Refund(ctx, settlement.RefundRequest{
+			ChannelID: bet.ChannelId,
+			OrderNo:   bet.ApiOrderNo,
+			Metadata:  domain.BuildBetMetadata(bet),
+		}); err != nil {
+			task.RetryNum += 1
+			task.NextRetryTime = time.Now().Unix() + 5
+			if task.RetryNum >= 20 {
+				task.Status = servermodel.RetryRefundTask_Status_close
+			}
+			return s.Ctx.RetryRefundTaskModel.Update(ctx, task)
 		}
-		return s.Ctx.RetryRefundTaskModel.Update(ctx, task)
 	}
 	_ = s.Ctx.BetModel.UpdateById(ctx, bet.Id, map[string]any{servermodel.Bet_F_order_status: servermodel.OrderStatusRefunded})
 	task.Status = servermodel.RetryRefundTask_Status_suc

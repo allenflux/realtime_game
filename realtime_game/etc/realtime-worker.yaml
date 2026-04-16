@@ -3,15 +3,14 @@ API:
   Host: 0.0.0.0
   Port: 18080
 Mysql:
-  DataSource: crash_admin:HYurRQDM$&n(Et7@tcp(api-sys-dev-rds.cluster-cre0080wclo2.ap-northeast-1.rds.amazonaws.com:3306)/crashv2?charset=utf8mb4&parseTime=true&loc=Asia%2FShanghai
-  GmDataSource: crash_admin:HYurRQDM$&n(Et7@tcp(api-sys-dev-rds.cluster-cre0080wclo2.ap-northeast-1.rds.amazonaws.com:3306)/gc_managerv2?charset=utf8mb4&parseTime=true&loc=Asia%2FShanghai
-
+  DataSource: crash_admin:bhucya44PCm2ECS@tcp(api-sys-test-rds-public-d545832802413e83.elb.ap-northeast-1.amazonaws.com)/crashv2?charset=utf8mb4&parseTime=true&loc=Asia%2FShanghai&timeout=1800s&readTimeout=1800s&writeTimeout=1800s
+  GmDataSource: crash_admin:bhucya44PCm2ECS@tcp(api-sys-test-rds-public-d545832802413e83.elb.ap-northeast-1.amazonaws.com)/gc_managerv2?charset=utf8mb4&parseTime=true&loc=Asia%2FShanghai&timeout=1800s&readTimeout=1800s&writeTimeout=1800s
 Redis:
-  Host: crashv2-dev-redis-public-5734b924bd9b8572.elb.ap-northeast-1.amazonaws.com:6379
+  Host: api-sys-test-redis-public-6d4905a3cad1382a.elb.ap-northeast-1.amazonaws.com:6379
   Type: node
   Pass: ""
 ApiSys:
-  Host: "http://sys-api-backend-external-service.api-sys.svc.cluster.local:80"
+  Host: "http://k8s-test-sysapiba-612db54d67-680e32a83e6eed2f.elb.ap-northeast-1.amazonaws.com"
   Token: "Bearer qSlM4XHrS2e4ilPYcPnSI0yB4b4YabUKj1dIol0aJuS18WiaFdUZDG1mKSRxQnTJI"
   Lang: en
 Runtime:
@@ -25,3 +24,24 @@ Runtime:
   RetryPageSize: 100
   AutoCashoutBatchSize: 200
   FinalizeSettlementPage: 500
+
+Features:
+  Bonus:
+    Enabled: true
+    Ratios: [0.10, 0.05, 0.02]
+  Jackpot:
+    Enabled: true
+  Leaderboard:
+    Enabled: true
+    Size: 20
+  Robot:
+    Enabled: true
+    CountPerRound: 3
+    MinAmount: 5
+    MaxAmount: 20
+    MinAutoCashMultiple: 1.2
+    MaxAutoCashMultiple: 3.0
+  Risk:
+    Enabled: true
+    LossThreshold: 500000
+    ForceControlWindow: 3

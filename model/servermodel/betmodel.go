@@ -18,6 +18,8 @@ const (
 	Bet_F_id                            = "id"
 	Bet_F_api_order_no                  = "api_order_no"
 	Bet_F_channel_id                    = "channel_id"
+	Bet_F_real_channel_id               = "real_channel_id"
+	Bet_F_runtime_channel_id            = "runtime_channel_id"
 	Bet_F_term_id                       = "term_id"
 	Bet_F_user_id                       = "user_id"
 	Bet_F_user_name                     = "user_name"
@@ -131,6 +133,7 @@ type (
 		GetByApiOrderNos(ctx context.Context, orderNos []string) ([]*Bet, error)
 		GetUncashedBetsByTerm(ctx context.Context, term *CrashTerm) (bets []*Bet, err error)
 		GetNormalByTermID(ctx context.Context, channelID int64, termID int64) (bets []*Bet, err error)
+		GetByRuntimeChannelAndTerm(ctx context.Context, runtimeChannelID int64, termID int64) (bets []*Bet, err error)
 		GetById(ctx context.Context, id int64) (*Bet, error)
 		GetUnrefundBetsByTerm(ctx context.Context, term *CrashTerm) (bets []*Bet, err error)
 		GetByIds(ctx context.Context, ids []int64) ([]*Bet, error)
@@ -251,11 +254,10 @@ func (m *customBetModel) GetUncashedBetsByTerm(ctx context.Context, term *CrashT
 		Select(betFieldNames...).
 		From(m.table).
 		Where("term_id = ?", term.TermId).
-		Where("channel_id = ?", term.ChannelId).
+		Where("runtime_channel_id = ? OR (runtime_channel_id = 0 AND channel_id = ?)", term.ChannelId, term.ChannelId).
 		Where("(auto_cashout_multiple <= ? OR (manual_cashout_multiple > 0 AND manual_cashout_multiple <= ?))",
 			term.Multiple, term.Multiple).
 		Where(sq.Eq{"order_status": []int64{OrderStatusCreated, OrderStatusCashingOut}}).
-		Where(sq.Eq{"channel_id": term.ChannelId}).
 		ToSql()
 
 	err = m.conn.QueryRowsCtx(ctx, &bets, sqlStr, sqlArgs...)
@@ -268,11 +270,13 @@ func (m *customBetModel) GetUncashedBetsByTerm(ctx context.Context, term *CrashT
 // 获取指定期， 所有退款中的注单
 func (m *customBetModel) GetUnrefundBetsByTerm(ctx context.Context, term *CrashTerm) (bets []*Bet, err error) {
 	bets = make([]*Bet, 0)
-	sqlStr, sqlArgs, _ := sq.Select(betFieldNames...).From(m.table).Where(sq.Eq{
-		Bet_F_term_id:      term.Id,
-		Bet_F_channel_id:   term.ChannelId,
-		Bet_F_order_status: OrderStatusRefunding,
-	}).ToSql()
+	sqlStr, sqlArgs, _ := sq.Select(betFieldNames...).From(m.table).
+		Where(sq.Eq{
+			Bet_F_term_id:      term.Id,
+			Bet_F_order_status: OrderStatusRefunding,
+		}).
+		Where("runtime_channel_id = ? OR (runtime_channel_id = 0 AND channel_id = ?)", term.ChannelId, term.ChannelId).
+		ToSql()
 	err = m.conn.QueryRowsCtx(ctx, &bets, sqlStr, sqlArgs...)
 	if err != nil && (err == sql.ErrNoRows || err == sqlx.ErrNotFound) {
 		err = nil
@@ -283,9 +287,24 @@ func (m *customBetModel) GetUnrefundBetsByTerm(ctx context.Context, term *CrashT
 // 按期获取所有正常注单
 func (m *customBetModel) GetNormalByTermID(ctx context.Context, channelID int64, termID int64) (bets []*Bet, err error) {
 	bets = make([]*Bet, 0)
-	sqlStr, sqlArgs, _ := sq.Select(betFieldNames...).From(m.table).Where("term_id=?", termID).Where("channel_id=?", channelID).
+	sqlStr, sqlArgs, _ := sq.Select(betFieldNames...).From(m.table).Where("term_id=?", termID).
+		Where("runtime_channel_id = ? OR (runtime_channel_id = 0 AND channel_id = ?)", channelID, channelID).
 		Where(sq.Eq{"order_status": []int64{OrderStatusCreated, OrderStatusCashingOut, OrderStatusCashedout}}).ToSql()
 	bets = make([]*Bet, 0)
+	err = m.conn.QueryRowsCtx(ctx, &bets, sqlStr, sqlArgs...)
+	if err != nil && (err == sql.ErrNoRows || err == sqlx.ErrNotFound) {
+		err = nil
+	}
+	return
+}
+
+func (m *customBetModel) GetByRuntimeChannelAndTerm(ctx context.Context, runtimeChannelID int64, termID int64) (bets []*Bet, err error) {
+	bets = make([]*Bet, 0)
+	sqlStr, sqlArgs, _ := sq.Select(betFieldNames...).From(m.table).
+		Where(sq.Eq{Bet_F_term_id: termID}).
+		Where("runtime_channel_id = ? OR (runtime_channel_id = 0 AND channel_id = ?)", runtimeChannelID, runtimeChannelID).
+		Where(sq.Eq{"order_status": []int64{OrderStatusCreated, OrderStatusCashingOut, OrderStatusCashedout}}).
+		ToSql()
 	err = m.conn.QueryRowsCtx(ctx, &bets, sqlStr, sqlArgs...)
 	if err != nil && (err == sql.ErrNoRows || err == sqlx.ErrNotFound) {
 		err = nil
@@ -616,11 +635,12 @@ func (m *customBetModel) GetBetsByItemIDChannelIDs(ctx context.Context, channelI
 // 获取指定局下的一页有效注单数据
 func (m *customBetModel) GetAllBetsByItemId(ctx context.Context, channelID int64, itemId int64) (resp []*Bet, err error) {
 	resp = make([]*Bet, 0)
-	sqb := sq.Select(betFieldNames...).From(m.table).Where(sq.Eq{
-		Bet_F_term_id:      itemId,
-		Bet_F_channel_id:   channelID,
-		Bet_F_order_status: []int64{OrderStatusCreated, OrderStatusCashedout},
-	})
+	sqb := sq.Select(betFieldNames...).From(m.table).
+		Where(sq.Eq{
+			Bet_F_term_id:      itemId,
+			Bet_F_order_status: []int64{OrderStatusCreated, OrderStatusCashedout},
+		}).
+		Where("runtime_channel_id = ? OR (runtime_channel_id = 0 AND channel_id = ?)", channelID, channelID)
 	sqlStr, sqlParams, err := sqb.ToSql()
 	if err != nil {
 		return
@@ -632,6 +652,9 @@ func (m *customBetModel) GetAllBetsByItemId(ctx context.Context, channelID int64
 
 func (m *customBetModel) GetTermCashoutBets(ctx context.Context, channelID []int64, itemId int64) (resp []*Bet, err error) {
 	resp = make([]*Bet, 0)
+	if len(channelID) == 0 {
+		return
+	}
 	conj := sq.And{
 		sq.Gt{Bet_F_cashed_out_amount: 0},
 		sq.Eq{
@@ -640,14 +663,18 @@ func (m *customBetModel) GetTermCashoutBets(ctx context.Context, channelID []int
 		sq.Eq{
 			Bet_F_term_id: itemId,
 		},
-		sq.Eq{
-			Bet_F_channel_id: channelID,
-		},
 	}
 
 	sqlStr, sqlParams, err := sq.Select(betFieldNames...).
 		From(m.table).
 		Where(conj).
+		Where(sq.Or{
+			sq.Eq{Bet_F_runtime_channel_id: channelID},
+			sq.And{
+				sq.Eq{Bet_F_runtime_channel_id: int64(0)},
+				sq.Eq{Bet_F_channel_id: channelID},
+			},
+		}).
 		ToSql()
 	if err != nil {
 		return

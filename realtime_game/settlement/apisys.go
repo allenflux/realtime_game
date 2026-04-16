@@ -7,11 +7,15 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"log"
 	"net/http"
+	"net/http/httputil"
 	"strconv"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/zeromicro/go-zero/core/logx"
 )
 
 const (
@@ -27,6 +31,7 @@ type Adapter interface {
 	BillPreMatch(ctx context.Context, req BillRequest, partial bool, partialCount int8) error
 	BatchBill(ctx context.Context, reqs []BillRequest) ([]string, []string, error)
 	ResolveGameKey(ctx context.Context, channelID int64) string
+	GetUserInfoByToken(ctx context.Context, token string) (*ApiSysGetUserData, error)
 }
 
 type apiSysAdapter struct {
@@ -43,7 +48,11 @@ func NewApiSysAdapter(host, token, lang string, gm gmmodel.GameChannelMappingMod
 		token: token,
 		lang:  lang,
 		gm:    gm,
-		http:  &http.Client{Timeout: 20 * time.Second},
+		http: &http.Client{
+			Timeout: 20 * time.Second,
+			Transport: &http.Transport{
+				Proxy: nil,
+			}},
 	}
 }
 
@@ -95,6 +104,87 @@ type apiWagerResp struct {
 	} `json:"data"`
 }
 
+type ApiSysGetUserResponse struct {
+	Code    int               `json:"code"`
+	Data    ApiSysGetUserData `json:"data"`
+	Message string            `json:"message"`
+}
+
+type ApiSysGetUserData struct {
+	ID       int64  `json:"id"`
+	Username string `json:"username"`
+}
+
+func parseApiSysGetUserResponse(resp string) (*ApiSysGetUserData, error) {
+	var result ApiSysGetUserResponse
+	if err := json.Unmarshal([]byte(resp), &result); err != nil {
+		logx.Errorf("parse apisys get user response failed, resp:%s err:%v", resp, err)
+		return nil, err
+	}
+
+	if result.Code != 200 {
+		if result.Message != "" {
+			return nil, errors.New(result.Message)
+		}
+		return nil, fmt.Errorf("apisys code=%d", result.Code)
+	}
+
+	return &result.Data, nil
+}
+
+func (a *apiSysAdapter) GetUserInfoByToken(ctx context.Context, token string) (*ApiSysGetUserData, error) {
+	url := a.host + "/api/internal/v1/user/info"
+
+	respBody, err := a.doRequest(ctx, http.MethodGet, url, nil, a.headersWithToken(token))
+	if err != nil {
+		return nil, err
+	}
+
+	return parseApiSysGetUserResponse(string(respBody))
+}
+
+func (a *apiSysAdapter) headersWithToken(token string) map[string]string {
+	return map[string]string{
+		"Authorization":   token,
+		"Accept-Language": a.lang,
+		"Content-Type":    "application/json",
+	}
+}
+
+func (a *apiSysAdapter) doRequest(ctx context.Context, method, url string, body io.Reader, headers map[string]string) ([]byte, error) {
+	req, err := http.NewRequestWithContext(ctx, method, url, body)
+	if err != nil {
+		return nil, err
+	}
+
+	for k, v := range headers {
+		req.Header.Set(k, v)
+	}
+
+	if req.Header.Get("Content-Type") == "" {
+		req.Header.Set("Content-Type", "application/json")
+	}
+
+	dumpReq, _ := httputil.DumpRequestOut(req, true)
+	log.Printf("HTTP REQUEST:\n%s", string(dumpReq))
+
+	resp, err := a.http.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	respBody, _ := io.ReadAll(resp.Body)
+	log.Printf("HTTP RESPONSE: status=%d", resp.StatusCode)
+	log.Printf("HTTP RESPONSE BODY: %s", string(respBody))
+
+	if resp.StatusCode >= 300 {
+		return nil, fmt.Errorf("apisys http status=%d body=%s", resp.StatusCode, string(respBody))
+	}
+
+	return respBody, nil
+}
+
 func (a *apiSysAdapter) ResolveGameKey(ctx context.Context, channelID int64) string {
 	if channelID == 0 {
 		return defaultGameKey
@@ -114,27 +204,71 @@ func (a *apiSysAdapter) headers() map[string]string {
 	}
 }
 
+//func (a *apiSysAdapter) doJSON(ctx context.Context, method, url string, body any, out any) error {
+//	buf, err := json.Marshal(body)
+//	if err != nil {
+//		return err
+//	}
+//	req, err := http.NewRequestWithContext(ctx, method, url, bytes.NewReader(buf))
+//	if err != nil {
+//		return err
+//	}
+//	for k, v := range a.headers() {
+//		req.Header.Set(k, v)
+//	}
+//	resp, err := a.http.Do(req)
+//	if err != nil {
+//		return err
+//	}
+//	defer resp.Body.Close()
+//	if resp.StatusCode >= 300 {
+//		return fmt.Errorf("apisys http status=%d", resp.StatusCode)
+//	}
+//	return json.NewDecoder(resp.Body).Decode(out)
+//}
+
 func (a *apiSysAdapter) doJSON(ctx context.Context, method, url string, body any, out any) error {
 	buf, err := json.Marshal(body)
 	if err != nil {
 		return err
 	}
+
 	req, err := http.NewRequestWithContext(ctx, method, url, bytes.NewReader(buf))
 	if err != nil {
 		return err
 	}
+
 	for k, v := range a.headers() {
 		req.Header.Set(k, v)
 	}
+
+	if req.Header.Get("Content-Type") == "" {
+		req.Header.Set("Content-Type", "application/json")
+	}
+
+	// 打印最终请求
+	dumpReq, _ := httputil.DumpRequestOut(req, true)
+	log.Printf("HTTP REQUEST:\n%s", string(dumpReq))
+
 	resp, err := a.http.Do(req)
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
+
+	respBody, _ := io.ReadAll(resp.Body)
+	log.Printf("HTTP RESPONSE: status=%d", resp.StatusCode)
+	log.Printf("HTTP RESPONSE BODY: %s", string(respBody))
+
 	if resp.StatusCode >= 300 {
-		return fmt.Errorf("apisys http status=%d", resp.StatusCode)
+		return fmt.Errorf("apisys http status=%d body=%s", resp.StatusCode, string(respBody))
 	}
-	return json.NewDecoder(resp.Body).Decode(out)
+
+	if len(respBody) == 0 {
+		return nil
+	}
+
+	return json.Unmarshal(respBody, out)
 }
 
 func (a *apiSysAdapter) checkCommonError(resp *apiResp) error {
@@ -171,6 +305,7 @@ func (a *apiSysAdapter) Deduct(ctx context.Context, req DeductRequest) (*DeductR
 	if err := a.doJSON(ctx, http.MethodPost, a.host+"/api/internal/v1/payment/request", payload, &resp); err != nil {
 		return nil, err
 	}
+
 	if err := a.checkCommonError(&resp); err != nil {
 		return nil, err
 	}

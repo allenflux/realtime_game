@@ -6,21 +6,31 @@ import (
 	"crash/model/servermodel"
 	appctx "crash/realtime_game/context"
 	"crash/realtime_game/domain"
+	"crash/realtime_game/settlement"
 	rttypes "crash/realtime_game/types"
 	"fmt"
 	"math/rand"
-
-	"crash/realtime_game/common"
+	"strings"
+	"sync/atomic"
+	"time"
 
 	"github.com/shopspring/decimal"
+	"github.com/zeromicro/go-zero/core/logx"
 )
 
 // Services 聚合所有服务。
 type Services struct {
-	Ctx *appctx.AppContext
+	Ctx   *appctx.AppContext
+	Hooks *GameHooks
 }
 
-func New(ctx *appctx.AppContext) *Services { return &Services{Ctx: ctx} }
+func New(ctx *appctx.AppContext) *Services {
+	svc := &Services{Ctx: ctx}
+	svc.Hooks = NewGameHooks(svc)
+	return svc
+}
+
+var orderSeq atomic.Int64
 
 func randUserSeed() string {
 	letters := []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
@@ -33,7 +43,15 @@ func randUserSeed() string {
 }
 
 func nextOrderNo() string {
-	return fmt.Sprintf("%d", common.GenerateId())
+	seq := orderSeq.Add(1) % 1000
+	return fmt.Sprintf("%d%03d", time.Now().UnixNano(), seq)
+}
+
+func isRobotBet(bet *servermodel.Bet) bool {
+	if bet == nil {
+		return false
+	}
+	return bet.UserId >= robotUserBase || strings.HasPrefix(strings.ToLower(bet.UserName), "robot_") || strings.HasPrefix(strings.ToLower(bet.ApiOrderNo), "robot_")
 }
 
 func chooseBetType(snap *domain.RoundSnapshot) int64 {
@@ -62,4 +80,28 @@ func buildCreateBetResponse(bet *servermodel.Bet) *rttypes.CreateBetResponse {
 		BetAtMutil:  domain.BetFieldToHumanMultiple(bet.BetAtMultiple),
 		ValidBetAmt: domain.DBAmountToString(bet.Amount),
 	}
+}
+
+func GetApiSysUserData(ctx context.Context, token string, app *appctx.AppContext) (*settlement.ApiSysGetUserData, error) {
+	return getApiSysUserData(ctx, token, app)
+}
+func getApiSysUserData(ctx context.Context, token string, app *appctx.AppContext) (*settlement.ApiSysGetUserData, error) {
+	userData, err := app.TokenUserStore.Get(ctx, token)
+	if err != nil {
+		return nil, err
+	}
+	if userData != nil {
+		return userData, nil
+	}
+
+	userData, err = app.Settlement.GetUserInfoByToken(ctx, token)
+	if err != nil {
+		return nil, err
+	}
+
+	if err = app.TokenUserStore.Set(ctx, token, userData, 100); err != nil {
+		logx.Errorf("cache apisys user info failed, err=%v", err)
+	}
+
+	return userData, nil
 }

@@ -39,6 +39,37 @@ type Config struct {
 		AutoCashoutBatchSize   int64 `json:",optional" yaml:",optional"`
 		FinalizeSettlementPage int64 `json:",optional" yaml:",optional"`
 	} `json:",optional" yaml:",optional"`
+
+	Features struct {
+		Bonus struct {
+			Enabled bool      `json:",optional" yaml:",optional"`
+			Ratios  []float64 `json:",optional" yaml:",optional"`
+		} `json:",optional" yaml:",optional"`
+
+		Jackpot struct {
+			Enabled bool `json:",optional" yaml:",optional"`
+		} `json:",optional" yaml:",optional"`
+
+		Leaderboard struct {
+			Enabled bool  `json:",optional" yaml:",optional"`
+			Size    int64 `json:",optional" yaml:",optional"`
+		} `json:",optional" yaml:",optional"`
+
+		Robot struct {
+			Enabled             bool    `json:",optional" yaml:",optional"`
+			CountPerRound       int64   `json:",optional" yaml:",optional"`
+			MinAmount           float64 `json:",optional" yaml:",optional"`
+			MaxAmount           float64 `json:",optional" yaml:",optional"`
+			MinAutoCashMultiple float64 `json:",optional" yaml:",optional"`
+			MaxAutoCashMultiple float64 `json:",optional" yaml:",optional"`
+		} `json:",optional" yaml:",optional"`
+
+		Risk struct {
+			Enabled            bool  `json:",optional" yaml:",optional"`
+			LossThreshold      int64 `json:",optional" yaml:",optional"`
+			ForceControlWindow int64 `json:",optional" yaml:",optional"`
+		} `json:",optional" yaml:",optional"`
+	} `json:",optional" yaml:",optional"`
 }
 
 // FillDefault 为缺省值补默认配置。
@@ -81,5 +112,32 @@ func (c *Config) FillDefault() {
 	}
 	if c.Runtime.FinalizeSettlementPage <= 0 {
 		c.Runtime.FinalizeSettlementPage = 500
+	}
+	if len(c.Features.Bonus.Ratios) == 0 {
+		c.Features.Bonus.Ratios = []float64{0.10, 0.05, 0.02}
+	}
+	if c.Features.Leaderboard.Size <= 0 {
+		c.Features.Leaderboard.Size = 20
+	}
+	if c.Features.Robot.CountPerRound <= 0 {
+		c.Features.Robot.CountPerRound = 3
+	}
+	if c.Features.Robot.MinAmount <= 0 {
+		c.Features.Robot.MinAmount = 5
+	}
+	if c.Features.Robot.MaxAmount <= 0 {
+		c.Features.Robot.MaxAmount = 50
+	}
+	if c.Features.Robot.MinAutoCashMultiple <= 0 {
+		c.Features.Robot.MinAutoCashMultiple = 1.2
+	}
+	if c.Features.Robot.MaxAutoCashMultiple <= 0 {
+		c.Features.Robot.MaxAutoCashMultiple = 3.5
+	}
+	if c.Features.Risk.LossThreshold <= 0 {
+		c.Features.Risk.LossThreshold = 500000
+	}
+	if c.Features.Risk.ForceControlWindow <= 0 {
+		c.Features.Risk.ForceControlWindow = 3
 	}
 }

@@ -121,3 +121,19 @@ func (s *SnapshotStore) IncrSnapshotVersion(ctx context.Context, channelID int64
 func (s *SnapshotStore) SaveWorkerHealth(ctx context.Context, workerID string, nowMs int64) error {
 	return s.rds.SetexCtx(ctx, keyWorkerHealth(workerID), strconv.FormatInt(nowMs, 10), 30)
 }
+
+func (s *SnapshotStore) SaveLeaderboardEntry(ctx context.Context, channelID int64, orderNo string, score int64) error {
+	_, err := s.rds.ZaddCtx(ctx, keyLeaderboard(channelID), score, orderNo)
+	return err
+}
+
+func (s *SnapshotStore) TopLeaderboard(ctx context.Context, channelID int64, size int64) ([]goredis.Pair, error) {
+	if size <= 0 {
+		size = 20
+	}
+	return s.rds.ZrevrangeWithScoresCtx(ctx, keyLeaderboard(channelID), 0, size-1)
+}
+
+func (s *SnapshotStore) AcquireRobotRound(ctx context.Context, termID int64, ttlSec int) (bool, error) {
+	return s.rds.SetnxExCtx(ctx, keyBotMarker(termID), "1", ttlSec)
+}

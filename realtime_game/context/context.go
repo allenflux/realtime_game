@@ -26,14 +26,19 @@ type AppContext struct {
 	ChannelModel          servermodel.ChannelModel
 	CrashTermModel        servermodel.CrashTermModel
 	BetModel              servermodel.BetModel
+	BonusBetModel         servermodel.BonusBetModel
 	RetryCashoutTaskModel servermodel.RetryCashoutTaskModel
 	RetryRefundTaskModel  servermodel.RetryRefundTaskModel
 
 	CurrencyLimitModel      gmmodel.CurrencyLimitModel
 	GameChannelMappingModel gmmodel.GameChannelMappingModel
+	JackpotConfigModel      gmmodel.JackpotConfigModel
+	JackpotRecordModel      gmmodel.JackpotRecordModel
+	GameStatisticsModel     gmmodel.GameStatisticsModel
 
-	SnapshotStore *store.SnapshotStore
-	LeaseStore    *store.LeaseStore
+	SnapshotStore  *store.SnapshotStore
+	LeaseStore     *store.LeaseStore
+	TokenUserStore *store.TokenUserStore
 
 	Settlement settlement.Adapter
 }
@@ -57,15 +62,20 @@ func New(c rtconfig.Config) *AppContext {
 		ChannelModel:          servermodel.NewChannelModel(db),
 		CrashTermModel:        servermodel.NewCrashTermModel(db),
 		BetModel:              servermodel.NewBetModel(db),
+		BonusBetModel:         servermodel.NewBonusBetModel(db),
 		RetryCashoutTaskModel: servermodel.NewRetryCashoutTaskModel(db),
 		RetryRefundTaskModel:  servermodel.NewRetryRefundTaskModel(db),
 
 		CurrencyLimitModel:      gmmodel.NewCurrencyLimitModel(gmdb),
 		GameChannelMappingModel: gmmodel.NewGameChannelMappingModel(gmdb),
+		JackpotConfigModel:      gmmodel.NewJackpotConfigModel(gmdb),
+		JackpotRecordModel:      gmmodel.NewJackpotRecordModel(gmdb),
+		GameStatisticsModel:     gmmodel.NewGameStatisticsModel(gmdb),
 	}
 
 	ctx.SnapshotStore = store.NewSnapshotStore(rds)
 	ctx.LeaseStore = store.NewLeaseStore(rds)
+	ctx.TokenUserStore = store.NewTokenUserStore(rds)
 	ctx.Settlement = settlement.NewApiSysAdapter(c.ApiSys.Host, c.ApiSys.Token, c.ApiSys.Lang, ctx.GameChannelMappingModel)
 	return ctx
 }

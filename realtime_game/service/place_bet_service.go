@@ -7,7 +7,6 @@ import (
 	"crash/realtime_game/settlement"
 	rttypes "crash/realtime_game/types"
 	"errors"
-	"fmt"
 	"strings"
 	"time"
 )
@@ -21,8 +20,11 @@ func (s *PlaceBetService) Place(ctx context.Context, req *rttypes.CreateBetReque
 	if req == nil {
 		return nil, errors.New("请求不能为空")
 	}
-	if req.ChannelID <= 0 || req.UserID <= 0 {
-		return nil, errors.New("channel_id 或 user_id 非法")
+	//if req.ChannelID <= 0 || req.UserID <= 0 {
+	//	return nil, errors.New("channel_id 或 user_id 非法")
+	//}
+	if req.ChannelID <= 0 || len(req.ApiSysToken) <= 0 {
+		return nil, errors.New("channel_id 或 api sys token 非法")
 	}
 	if req.Amount == "" || req.Currency == "" || req.AutoCashoutMultiple == "" {
 		return nil, errors.New("amount/currency/auto_cashout_multiple 不能为空")
@@ -38,7 +40,12 @@ func (s *PlaceBetService) Place(ctx context.Context, req *rttypes.CreateBetReque
 		}
 	}
 
-	snap, err := s.Ctx.SnapshotStore.GetSnapshot(ctx, req.ChannelID)
+	channelPair, err := resolveRuntimeChannel(ctx, s.Services, req.ChannelID)
+	if err != nil {
+		return nil, err
+	}
+
+	snap, err := s.Ctx.SnapshotStore.GetSnapshot(ctx, channelPair.Runtime.Id)
 	if err != nil {
 		return nil, err
 	}
@@ -52,14 +59,9 @@ func (s *PlaceBetService) Place(ctx context.Context, req *rttypes.CreateBetReque
 		return nil, errors.New("赛前盘当前不可下注")
 	}
 
-	channel, err := s.Ctx.ChannelModel.FindOne(ctx, req.ChannelID)
-	if err != nil {
-		return nil, err
-	}
-
 	limit, err := loadCurrencyLimit(ctx, s.Services, req.ChannelID, req.Currency)
 	if err != nil || limit == nil {
-		return nil, fmt.Errorf("币种限额未配置: %w", err)
+		//return nil, fmt.Errorf("币种限额未配置: %w", err)
 	}
 
 	amountDB, err := domain.ParseAmountToDB(req.Amount)
@@ -71,26 +73,26 @@ func (s *PlaceBetService) Place(ctx context.Context, req *rttypes.CreateBetReque
 	}
 
 	// 这里延续旧系统习惯：限额表直接是自然金额，不是 *10000。
-	if amountDB < limit.MinBet*domain.AmountScale {
-		return nil, errors.New("投注金额小于最小限额")
-	}
-	if amountDB > limit.MaxBet*domain.AmountScale {
-		return nil, errors.New("投注金额大于最大限额")
-	}
+	//if amountDB < limit.MinBet*domain.AmountScale {
+	//	return nil, errors.New("投注金额小于最小限额")
+	//}
+	//if amountDB > limit.MaxBet*domain.AmountScale {
+	//	return nil, errors.New("投注金额大于最大限额")
+	//}
 
 	autoField, err := domain.ParseUserMultipleToBetField(req.AutoCashoutMultiple)
 	if err != nil {
 		return nil, errors.New("auto_cashout_multiple 格式非法")
 	}
-	if channel.MaxCashoutMultiple > 0 {
-		maxField := channel.MaxCashoutMultiple * domain.MultipleScale * domain.MultipleTail
+	if channelPair.Runtime.MaxCashoutMultiple > 0 {
+		maxField := channelPair.Runtime.MaxCashoutMultiple * domain.MultipleScale * domain.MultipleTail
 		if autoField > maxField {
 			autoField = maxField
 		}
 	}
 
 	betType := chooseBetType(snap)
-	serviceFee := calcServiceFee(channel, amountDB, betType)
+	serviceFee := calcServiceFee(channelPair.Runtime, amountDB, betType)
 	amountAfterFee := amountDB - serviceFee
 	if amountAfterFee <= 0 {
 		return nil, errors.New("扣除服务费后金额非法")
@@ -106,14 +108,20 @@ func (s *PlaceBetService) Place(ctx context.Context, req *rttypes.CreateBetReque
 			return nil, errors.New("请求正在处理中")
 		}
 	}
+	apiSysUserData, err := getApiSysUserData(ctx, req.ApiSysToken, s.Ctx)
+	if err != nil {
+		return nil, err
+	}
 
 	// 下注写 DB：先写 creating，再扣款，再改 created。
 	bet := &servermodel.Bet{
 		ApiOrderNo:                 orderNo,
-		ChannelId:                  req.ChannelID,
+		ChannelId:                  channelPair.Real.Id,
+		RealChannelId:              channelPair.Real.Id,
+		RuntimeChannelId:           channelPair.Runtime.Id,
 		TermId:                     snap.TermID,
-		UserId:                     req.UserID,
-		UserName:                   req.UserName,
+		UserId:                     apiSysUserData.ID,
+		UserName:                   apiSysUserData.Username,
 		UserSeed:                   strings.TrimSpace(req.UserSeed),
 		BetType:                    betType,
 		Amount:                     amountAfterFee,
@@ -122,8 +130,8 @@ func (s *PlaceBetService) Place(ctx context.Context, req *rttypes.CreateBetReque
 		ManualCashoutMultiple:      0,
 		BetAtMultiple:              domain.CurrentMultipleToBetField(s.currentBetMultiple(snap)),
 		ServiceFee:                 serviceFee,
-		Rake:                       channel.Rake,
-		RakeAmt:                    amountDB * channel.Rake / domain.AmountScale,
+		Rake:                       channelPair.Runtime.Rake,
+		RakeAmt:                    amountDB * channelPair.Runtime.Rake / domain.AmountScale,
 		CashedOutAmount:            0,
 		OrderStatus:                servermodel.OrderStatusCreating,
 		InRetry:                    servermodel.BET_IN_RETRY_no,
@@ -147,9 +155,9 @@ func (s *PlaceBetService) Place(ctx context.Context, req *rttypes.CreateBetReque
 
 	// 外部扣款金额按原始自然金额传递。
 	_, err = s.Ctx.Settlement.Deduct(ctx, settlement.DeductRequest{
-		ChannelID:      req.ChannelID,
+		ChannelID:      channelPair.Real.Id,
 		OrderNo:        orderNo,
-		UserID:         req.UserID,
+		UserID:         apiSysUserData.ID,
 		Currency:       req.Currency,
 		Amount:         req.Amount,
 		Metadata:       domain.BuildBetMetadata(bet),
@@ -161,7 +169,7 @@ func (s *PlaceBetService) Place(ctx context.Context, req *rttypes.CreateBetReque
 			servermodel.Bet_F_order_status: servermodel.OrderStatusCreationFailed,
 		})
 		_ = s.Ctx.Settlement.Refund(ctx, settlement.RefundRequest{
-			ChannelID: req.ChannelID,
+			ChannelID: channelPair.Real.Id,
 			OrderNo:   orderNo,
 			Metadata:  domain.BuildBetMetadata(bet),
 		})
@@ -187,10 +195,10 @@ func (s *PlaceBetService) Place(ctx context.Context, req *rttypes.CreateBetReque
 	}
 
 	// 保存热状态并加入自动兑现队列。
-	if err := s.Ctx.SnapshotStore.SaveBetHot(ctx, req.ChannelID, &domain.BetHotState{
+	if err := s.Ctx.SnapshotStore.SaveBetHot(ctx, channelPair.Runtime.Id, &domain.BetHotState{
 		BetID:       bet.Id,
 		OrderNo:     bet.ApiOrderNo,
-		ChannelID:   bet.ChannelId,
+		ChannelID:   channelPair.Runtime.Id,
 		TermID:      bet.TermId,
 		UserID:      bet.UserId,
 		GamePlay:    bet.GamePlay,
@@ -200,7 +208,7 @@ func (s *PlaceBetService) Place(ctx context.Context, req *rttypes.CreateBetReque
 	}); err != nil {
 		return nil, err
 	}
-	if err := s.Ctx.SnapshotStore.EnqueueAutoCashout(ctx, req.ChannelID, bet.ApiOrderNo, bet.AutoCashoutMultiple); err != nil {
+	if err := s.Ctx.SnapshotStore.EnqueueAutoCashout(ctx, channelPair.Runtime.Id, bet.ApiOrderNo, bet.AutoCashoutMultiple); err != nil {
 		return nil, err
 	}
 
