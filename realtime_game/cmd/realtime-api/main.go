@@ -17,7 +17,7 @@ import (
 	"github.com/zeromicro/go-zero/core/logx"
 )
 
-var configFile = flag.String("f", "realtime_game/etc/realtime-api.yaml", "配置文件")
+var configFile = flag.String("f", "realtime_game/etc/realtime-api.docker.yaml", "配置文件")
 
 func main() {
 	flag.Parse()

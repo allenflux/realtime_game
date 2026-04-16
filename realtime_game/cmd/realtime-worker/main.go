@@ -16,7 +16,7 @@ import (
 	"github.com/zeromicro/go-zero/core/logx"
 )
 
-var configFile = flag.String("f", "realtime_game/etc/realtime-worker.yaml", "配置文件")
+var configFile = flag.String("f", "realtime_game/etc/realtime-worker.docker.yaml", "配置文件")
 
 type runner struct {
 	cancel context.CancelFunc

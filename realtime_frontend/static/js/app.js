@@ -27,6 +27,7 @@
     profileId: $("profileId"),
     roundId: $("roundId"),
     roundState: $("roundState"),
+    countdownLabel: $("countdownLabel"),
     countdown: $("countdown"),
     serverTime: $("serverTime"),
     version: $("version"),
@@ -130,6 +131,17 @@
     if (currentState === "starting") return safeNumber(round.flying_start_at_ms);
     if (currentState === "flying") return safeNumber(round.crash_at_ms);
     return safeNumber(round.close_at_ms);
+  }
+
+  function countdownLabel(round) {
+    if (!round) return "Countdown";
+    const currentState = String(round.state || "");
+    if (currentState === "pre_start") return "Bet Window";
+    if (currentState === "starting") return "Launch";
+    if (currentState === "flying") return "Crash ETA";
+    if (currentState === "crashed") return "Close In";
+    if (currentState === "closed") return "Next Round";
+    return "Countdown";
   }
 
   function calcCurrentMultiple(round, nowMs) {
@@ -267,6 +279,7 @@
 
     els.roundId.textContent = String(round.term_id || "--");
     els.roundState.textContent = String(round.state || "--");
+    els.countdownLabel.textContent = countdownLabel(round);
     els.countdown.textContent = `${(leftMs / 1000).toFixed(1)}s`;
     els.serverTime.textContent = formatServerTime(round.server_time_ms || nowMs);
     els.version.textContent = String(round.version || "--");
